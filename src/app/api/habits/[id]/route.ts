@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Cadence as PrismaCadence } from "@prisma/client"; // ✅
+
+const CADENCES: ReadonlyArray<PrismaCadence> = ["DAILY", "WEEKLY"];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { title, description, targetPer } = await req.json();
+    const { title, description, targetPer, cadence } = await req.json();
 
     const data: Record<string, any> = {};
-    if (typeof title === "string" && title.trim().length > 0) data.title = title.trim();
+    if (typeof title === "string" && title.trim()) data.title = title.trim();
     if (typeof description === "string") data.description = description.trim() || null;
+
     if (targetPer !== undefined) {
       const goal = Number(targetPer);
       if (!Number.isFinite(goal) || goal < 1 || goal > 50) {
@@ -16,10 +20,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.targetPer = goal;
     }
 
+    if (typeof cadence === "string") {
+      const cadRaw = cadence.toUpperCase();
+      if ((CADENCES as readonly string[]).includes(cadRaw)) {
+        data.cadence = cadRaw as PrismaCadence; // ✅
+      }
+    }
+
     const habit = await prisma.habit.update({
       where: { id: params.id },
       data,
-      select: { id: true, title: true, description: true, targetPer: true, archived: true },
+      select: { id: true, title: true, description: true, targetPer: true, cadence: true, archived: true },
     });
 
     return NextResponse.json(habit);

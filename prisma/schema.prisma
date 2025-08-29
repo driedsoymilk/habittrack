@@ -7,11 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Cadence {
+  DAILY
+  WEEKLY
+}
+
 model Habit {
   id          String       @id @default(cuid())
   title       String
   description String?
   targetPer   Int          @default(1)
+  cadence     Cadence      @default(WEEKLY) // 👈 NEW
   archived    Boolean      @default(false)
   createdAt   DateTime     @default(now())
   entries     HabitEntry[]
@@ -20,7 +26,7 @@ model Habit {
 model HabitEntry {
   id        String   @id @default(cuid())
   habitId   String
-  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade) // 👈 add this
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
   date      DateTime
   count     Int      @default(1)
   createdAt DateTime @default(now())

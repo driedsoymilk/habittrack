@@ -15,3 +15,27 @@ export function endOfWeekUTC(d = new Date()) {
   end.setUTCDate(end.getUTCDate() + 7); // exclusive upper bound
   return end;
 }
+
+
+export function toMidnightUTC(d: Date) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+export function lastNDaysUTC(n: number, ref = new Date()) {
+  const days: Date[] = [];
+  const end = toMidnightUTC(ref);
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(end);
+    d.setUTCDate(end.getUTCDate() - i);
+    days.push(d);
+  }
+  return days;
+}
+
+export function sameDayUTC(a: Date, b: Date) {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  );
+}

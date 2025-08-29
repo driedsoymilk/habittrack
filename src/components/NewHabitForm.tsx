@@ -3,13 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function NewHabitForm() {
+type Props = { onCreated?: () => void };
+
+export default function NewHabitForm({ onCreated }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetPer, setTargetPer] = useState(1);
+  const [cadence, setCadence] = useState<"DAILY" | "WEEKLY">("WEEKLY");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const goalLabel = cadence === "DAILY" ? "Goal (times / day)" : "Goal (times / week)";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +24,7 @@ export default function NewHabitForm() {
     const res = await fetch("/api/habits", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, targetPer }),
+      body: JSON.stringify({ title, description, targetPer, cadence }),
     });
 
     if (!res.ok) {
@@ -29,11 +34,10 @@ export default function NewHabitForm() {
       return;
     }
 
-    setTitle("");
-    setDescription("");
-    setTargetPer(1);
+    setTitle(""); setDescription(""); setTargetPer(1); setCadence("WEEKLY");
     router.refresh();
     setSubmitting(false);
+    onCreated?.(); // 👈 auto-close the panel
   }
 
   return (
@@ -63,11 +67,21 @@ export default function NewHabitForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">Goal (times / week)</label>
+          <label className="block text-sm font-medium text-gray-900 mb-1">Cadence</label>
+          <select
+            className="w-full rounded-lg border px-3 py-2 text-gray-900"
+            value={cadence}
+            onChange={(e) => setCadence(e.target.value as "DAILY" | "WEEKLY")}
+          >
+            <option value="WEEKLY">Weekly</option>
+            <option value="DAILY">Daily</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-1">{goalLabel}</label>
           <input
-            type="number"
-            min={1}
-            max={50}
+            type="number" min={1} max={50}
             className="w-full rounded-lg border px-3 py-2 text-gray-900"
             value={targetPer}
             onChange={(e) => setTargetPer(Number(e.target.value))}
