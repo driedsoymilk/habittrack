@@ -1,33 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { getUserId } from "@/lib/auth-helpers";
 
-// helper: normalize to midnight UTC
 function todayUTC() {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const habitId = params.id;
-    const body = await req.json().catch(() => ({}));
-    const delta = body.delta ?? 1;
-    const date = todayUTC();
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  const userId = getUserId(session);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const entry = await prisma.habitEntry.upsert({
-      where: {
-        habitId_date: { habitId, date }, // composite unique key
-      },
-      update: { count: { increment: delta } },
-      create: { habitId, date, count: delta },
-    });
+  const { id } = await context.params;
 
-    return NextResponse.json(entry);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
-  }
+  const habit = await prisma.habit.findFirst({
+    where: { id, userId },
+    select: { id: true }
+  });
+  if (!habit) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
+  const delta = Number(body?.delta ?? 1);
+  const date = todayUTC();
+
+  const entry = await prisma.habitEntry.upsert({
+    where: { habitId_date: { habitId: habit.id, date } },
+    update: { count: { increment: delta } },
+    create: { habitId: habit.id, date, count: delta }
+  });
+
+  return NextResponse.json(entry);
 }

@@ -1,6 +1,6 @@
 type Props = {
-  completed: number; // clamped sum across weekly habits this week
-  target: number;    // sum of weekly targets
+  completed: number;
+  target: number;
 };
 
 export default function GlobalWeeklySummary({ completed, target }: Props) {
@@ -16,17 +16,9 @@ export default function GlobalWeeklySummary({ completed, target }: Props) {
           <span className="text-sm text-white/90">{Math.round(percent * 100)}%</span>
         )}
       </div>
-
-      <div
-        className="w-full h-3 rounded-full bg-gray-300 overflow-hidden ring-1 ring-gray-400"
-        aria-label="Weekly completion progress"
-      >
-        <div
-          className="h-full bg-green-600"
-          style={{ width: `${percent * 100}%` }}
-        />
+      <div className="w-full h-3 rounded-full bg-gray-300 overflow-hidden ring-1 ring-gray-400" aria-label="Weekly completion progress">
+        <div className="h-full bg-green-600" style={{ width: `${percent * 100}%` }} />
       </div>
-
       {target > 0 && (
         <div className="mt-1 text-xs text-white/80">
           {completed} / {target} checks this week

@@ -15,7 +15,6 @@ export default function AddHabitPanel() {
       >
         {open ? "Close" : "Add Habit"}
       </button>
-
       {open && (
         <div className="mt-3">
           <NewHabitForm onCreated={() => setOpen(false)} />

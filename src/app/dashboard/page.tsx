@@ -5,32 +5,44 @@ import GlobalDailyHeatmap from "@/components/GlobalDailyHeatmap";
 import GlobalWeeklySummary from "@/components/GlobalWeeklySummary";
 import { startOfWeekUTC, endOfWeekUTC, toMidnightUTC, lastNDaysUTC } from "@/lib/dates";
 import type { Cadence } from "@/types/habits";
+import AuthButtons from "@/components/AuthButtons";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { getUserId } from "@/lib/auth-helpers";
 
-// Server Component
 export default async function Dashboard() {
-  const data = await loadHabitsData();
+  const session = await getServerSession(authOptions);
+  const userId = getUserId(session);
 
   return (
     <main className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-white">Habit Dashboard</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">Habit Dashboard</h1>
+        <AuthButtons userName={session?.user?.name ?? null} />
+      </div>
 
-      {/* Global daily heatmap (DAILY habits) */}
+      {!userId ? (
+        <p className="text-white">Sign in to view your dashboard.</p>
+      ) : (
+        await renderAuthed(userId)
+      )}
+    </main>
+  );
+}
+
+async function renderAuthed(userId: string) {
+  const data = await loadHabitsData(userId);
+
+  return (
+    <>
       <GlobalDailyHeatmap
         labels={data.globalDaily.labels}
         titles={data.globalDaily.titles}
         percents={data.globalDaily.percents}
         empty={data.globalDaily.totalTarget === 0}
       />
-
-      {/* Global weekly summary (WEEKLY habits) */}
-      <GlobalWeeklySummary
-        completed={data.globalWeekly.completed}
-        target={data.globalWeekly.target}
-      />
-
-      {/* Toggleable creation form */}
+      <GlobalWeeklySummary completed={data.globalWeekly.completed} target={data.globalWeekly.target} />
       <AddHabitPanel />
-
       {data.habits.length === 0 ? (
         <p className="text-white">No habits yet. Click “Add Habit” to create your first one.</p>
       ) : (
@@ -49,39 +61,38 @@ export default async function Dashboard() {
           ))}
         </div>
       )}
-    </main>
+    </>
   );
 }
 
-async function loadHabitsData() {
-  // Base list (include cadence) for cards
+async function loadHabitsData(userId: string) {
   const habits = await prisma.habit.findMany({
-    where: { archived: false },
+    where: { archived: false, userId },
     orderBy: { createdAt: "asc" },
-    select: { id: true, title: true, description: true, targetPer: true, cadence: true },
+    select: { id: true, title: true, description: true, targetPer: true, cadence: true }
   });
 
-  // ---- Per-card aggregates: weekly + today ----
   const start = startOfWeekUTC();
   const end = endOfWeekUTC();
   const today = toMidnightUTC(new Date());
+  const days = lastNDaysUTC(7);
 
   const perHabit = await Promise.all(
     habits.map(async (h) => {
       const [weekAgg, todayEntry] = await Promise.all([
         prisma.habitEntry.aggregate({
           where: { habitId: h.id, date: { gte: start, lt: end } },
-          _sum: { count: true },
+          _sum: { count: true }
         }),
         prisma.habitEntry.findUnique({
           where: { habitId_date: { habitId: h.id, date: today } },
-          select: { count: true },
-        }),
+          select: { count: true }
+        })
       ]);
       return {
         id: h.id,
         weeklyCount: weekAgg._sum.count ?? 0,
-        todayCount: todayEntry?.count ?? 0,
+        todayCount: todayEntry?.count ?? 0
       };
     })
   );
@@ -89,24 +100,19 @@ async function loadHabitsData() {
   const weeklyCounts = Object.fromEntries(perHabit.map((r) => [r.id, r.weeklyCount]));
   const todayCounts = Object.fromEntries(perHabit.map((r) => [r.id, r.todayCount]));
 
-  // ---- Global 7-day heatmap (DAILY habits only) ----
-  const dailyHabits = habits.filter((h) => h.cadence === "DAILY");
-  const totalDailyTarget = dailyHabits.reduce((s, h) => s + h.targetPer, 0);
-  const days = lastNDaysUTC(7); // left=oldest, right=today
+  const dailyHabits = habits.filter((hh) => hh.cadence === "DAILY");
+  const totalDailyTarget = dailyHabits.reduce((s, hh) => s + hh.targetPer, 0);
 
   let percents: number[] = Array(7).fill(0);
-
   if (totalDailyTarget > 0 && dailyHabits.length > 0) {
     const entries = await prisma.habitEntry.findMany({
-      where: { habitId: { in: dailyHabits.map((h) => h.id) }, date: { gte: days[0] } },
-      select: { habitId: true, date: true, count: true },
+      where: { habitId: { in: dailyHabits.map((hh) => hh.id) }, date: { gte: days[0] } },
+      select: { habitId: true, date: true, count: true }
     });
 
     const norm = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     const toKey = (d: Date) =>
       `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-
-    // Map: "habitId|YYYY-MM-DD" -> total count
     const entryMap = new Map<string, number>();
     for (const e of entries) {
       const d = norm(e.date);
@@ -116,15 +122,14 @@ async function loadHabitsData() {
 
     percents = days.map((d) => {
       const keyDate = toKey(d);
-      const completed = dailyHabits.reduce((sum, h) => {
-        const c = entryMap.get(`${h.id}|${keyDate}`) ?? 0;
-        return sum + Math.min(c, h.targetPer); // cap at target per habit
+      const completed = dailyHabits.reduce((sum, hh) => {
+        const c = entryMap.get(`${hh.id}|${keyDate}`) ?? 0;
+        return sum + Math.min(c, hh.targetPer);
       }, 0);
       return Math.max(0, Math.min(1, completed / totalDailyTarget));
     });
   }
 
-  // Labels & tooltips for heatmap
   const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const labels = days.map((d) => weekday[d.getUTCDay()]);
   const titles = days.map((d, i) => {
@@ -135,12 +140,11 @@ async function loadHabitsData() {
   });
   const globalDaily = { labels, titles, percents, totalTarget: totalDailyTarget };
 
-  // ---- Global weekly percentage (WEEKLY habits only) ----
-  const weeklyHabits = habits.filter((h) => h.cadence === "WEEKLY");
-  const weeklyTarget = weeklyHabits.reduce((s, h) => s + h.targetPer, 0);
-  const weeklyCompleted = weeklyHabits.reduce((s, h) => {
-    const done = weeklyCounts[h.id] ?? 0;
-    return s + Math.min(done, h.targetPer);
+  const weeklyHabits = habits.filter((hh) => hh.cadence === "WEEKLY");
+  const weeklyTarget = weeklyHabits.reduce((s, hh) => s + hh.targetPer, 0);
+  const weeklyCompleted = weeklyHabits.reduce((s, hh) => {
+    const done = weeklyCounts[hh.id] ?? 0;
+    return s + Math.min(done, hh.targetPer);
   }, 0);
   const globalWeekly = { target: weeklyTarget, completed: weeklyCompleted };
 

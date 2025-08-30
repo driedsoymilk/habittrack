@@ -10,9 +10,9 @@ type HabitCardProps = {
   title: string;
   description?: string | null;
   targetPer: number;
-  cadence: Cadence;          // "DAILY" | "WEEKLY"
-  weeklyCount: number;       // total this week
-  todayCount: number;        // total today
+  weeklyCount: number;
+  todayCount: number;
+  cadence: Cadence;
 };
 
 export default function HabitCard({
@@ -30,7 +30,7 @@ export default function HabitCard({
 
   const isDaily = cadence === "DAILY";
   const numerator = isDaily ? todayCount : weeklyCount;
-  const denominator = targetPer; // DAILY uses /day; WEEKLY uses /week
+  const denominator = targetPer;
   const progress = Math.max(0, Math.min(1, denominator ? numerator / denominator : 0));
   const goalLabel = isDaily ? `Goal: ${targetPer}×/day` : `Goal: ${targetPer}×/week`;
   const progressLabel = isDaily ? "Today" : "This week";
@@ -78,7 +78,7 @@ export default function HabitCard({
         </span>
       </div>
 
-      {/* Progress (daily or weekly) */}
+      {}
       <div className="mt-4">
         <div className="flex items-center justify-between text-sm mb-1 text-gray-900">
           <span>{progressLabel}</span>
@@ -94,7 +94,7 @@ export default function HabitCard({
         </div>
       </div>
 
-      {/* Actions */}
+      {}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           onClick={handleCheckIn}
