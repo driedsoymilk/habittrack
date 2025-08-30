@@ -2,9 +2,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 import { prisma } from "@/lib/prisma";
 
+function hasStringId(u: unknown): u is { id: string } {
+  return typeof u === "object" && u !== null && "id" in u && typeof (u as { id?: unknown }).id === "string";
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
-  // Credentials requires JWT sessions
   session: { strategy: "jwt" },
   providers: [
     CredentialsProvider({
@@ -16,14 +19,13 @@ export const authOptions: NextAuthOptions = {
           update: {},
           create: { email: "demo@habit.local", name: "Demo User" }
         });
-        // Must return an object with an id so token.sub is set
         return { id: user.id, name: user.name ?? null, email: user.email ?? null, image: user.image ?? null };
       }
     })
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user && typeof (user as any).id === "string") token.sub = (user as any).id;
+      if (hasStringId(user)) token.sub = user.id;
       return token;
     },
     async session({ session, token }) {
