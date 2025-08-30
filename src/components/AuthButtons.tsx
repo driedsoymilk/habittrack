@@ -10,7 +10,7 @@ export default function AuthButtons({ userName }: { userName?: string | null }) 
           <button onClick={() => signOut()} className="rounded-lg px-3 py-2 text-sm border text-white hover:bg-white/10">Sign out</button>
         </>
       ) : (
-        <button onClick={() => signIn("github")} className="rounded-lg px-3 py-2 text-sm border text-white hover:bg-white/10">Sign in with GitHub</button>
+        <button onClick={() => signIn("credentials")} className="rounded-lg px-3 py-2 text-sm border text-white hover:bg-white/10">Continue</button>
       )}
     </div>
   );
